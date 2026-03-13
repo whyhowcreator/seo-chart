@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SEO 노출 그래프 생성기 v3.0</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+  background: #f7f6f3;
+  color: #37352f;
+  min-height: 100vh;
+}
+
+.container {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 24px 20px;
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.header h1 { font-size: 22px; color: #37352f; }
+.header .version { font-size: 13px; color: #a3a3a0; }
+
+.card {
+  background: #fff;
+  border: 1px solid #e8e5e0;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.card-title {
+  font-size: 13px;
+  font-weight: bold;
+  color: #5b7b9a;
+  margin-bottom: 12px;
+}
+
+/* 파일 선택 */
+.file-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.file-name {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #e8e5e0;
+  border-radius: 6px;
+  background: #fbfaf8;
+  font-size: 13px;
+  color: #6b6b6b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.btn-sm {
+  padding: 8px 14px;
+  border: 1px solid #e8e5e0;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.btn-sm:hover { background: #f2f1ee; }
+
+.sheet-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.sheet-row label { font-size: 13px; color: #6b6b6b; }
+.sheet-row select {
+  flex: 1;
+  padding: 7px 10px;
+  border: 1px solid #e8e5e0;
+  border-radius: 6px;
+  background: #fbfaf8;
+  font-size: 13px;
+}
+
+/* 설정 영역 */
+.settings-row {
+  display: flex;
+  gap: 8px;
+}
+.settings-row .card { flex: 1; }
+
+.col-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 16px;
+}
+.col-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.col-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.col-item label { font-size: 12px; color: #6b6b6b; white-space: nowrap; }
+.col-item input {
+  width: 48px;
+  padding: 5px 4px;
+  border: 1px solid #e8e5e0;
+  border-radius: 4px;
+  font-size: 12px;
+  text-align: center;
+  background: #fbfaf8;
+}
+
+/* 기간 설정 */
+.quick-btns {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.quick-btn {
+  padding: 5px 10px;
+  border: 1px solid #e8e5e0;
+  border-radius: 15px;
+  background: #fbfaf8;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.quick-btn.active {
+  background: #5b7b9a;
+  color: white;
+  border-color: #5b7b9a;
+}
+.quick-btn:hover:not(.active) { background: #f2f1ee; }
+
+.date-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+.date-row .label { font-weight: bold; color: #5b7b9a; width: 30px; }
+.date-row input {
+  width: 52px;
+  padding: 5px 4px;
+  border: 1px solid #e8e5e0;
+  border-radius: 4px;
+  font-size: 12px;
+  text-align: center;
+  background: #fbfaf8;
+}
+.date-row span { font-size: 11px; color: #6b6b6b; }
+
+/* 생성 버튼 */
+.btn-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.btn-action {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: bold;
+  color: white;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.btn-action:hover { opacity: 0.88; }
+.btn-action:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-weekly { background: #5b7b9a; }
+.btn-daily { background: #9a7b8a; }
+.btn-both { background: #7b9a7e; }
+
+/* 차트 영역 */
+.chart-area {
+  background: #fff;
+  border: 1px solid #e8e5e0;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+  display: none;
+}
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.chart-title { font-size: 15px; font-weight: bold; }
+.chart-subtitle { font-size: 12px; color: gray; }
+.btn-download {
+  padding: 6px 14px;
+  border: 1px solid #5b7b9a;
+  border-radius: 6px;
+  background: white;
+  color: #5b7b9a;
+  font-size: 12px;
+  cursor: pointer;
+}
+.btn-download:hover { background: #5b7b9a; color: white; }
+.chart-canvas-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+.chart-canvas-wrap canvas {
+  min-width: 700px;
+}
+
+/* 로그 */
+.log-area {
+  background: #f2f1ee;
+  border: 1px solid #e8e5e0;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 12px;
+  color: #4a4a47;
+  max-height: 140px;
+  overflow-y: auto;
+  line-height: 1.6;
+}
+.log-info { color: #5b7b9a; }
+.log-success { color: #4a8a5a; }
+.log-warn { color: #a07840; }
+.log-error { color: #b05050; }
+.log-dim { color: #a3a3a0; }
+
+@media (max-width: 640px) {
+  .settings-row { flex-direction: column; }
+  .col-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- 헤더 -->
+  <div class="header">
+    <h1>SEO 노출 그래프 생성기</h1>
+    <span class="version">v3.0 Web</span>
+  </div>
+
+  <!-- 파일 선택 -->
+  <div class="card">
+    <div class="card-title">파일 선택</div>
+    <div class="file-row">
+      <div class="file-name" id="fileName">엑셀 파일을 선택해주세요</div>
+      <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none">
+      <button class="btn-sm" onclick="document.getElementById('fileInput').click()">불러오기</button>
+    </div>
+    <div class="sheet-row">
+      <label>시트</label>
+      <select id="sheetSelect"><option value="">파일을 먼저 선택하세요</option></select>
+    </div>
+  </div>
+
+  <!-- 설정 영역 -->
+  <div class="settings-row">
+    <!-- 열 설정 -->
+    <div class="card">
+      <div class="card-title">열(Column) 설정</div>
+      <div class="col-grid">
+        <div class="col-item">
+          <div class="col-dot" style="background:#2ca02c"></div>
+          <label>자체블로그</label>
+          <input type="text" id="colSelf" value="Q">
+        </div>
+        <div class="col-item">
+          <div class="col-dot" style="background:#1f77b4"></div>
+          <label>외주블로그</label>
+          <input type="text" id="colOut" value="U">
+        </div>
+        <div class="col-item">
+          <div class="col-dot" style="background:#ff7f0e"></div>
+          <label>지식인</label>
+          <input type="text" id="colJisikin" value="Y">
+        </div>
+        <div class="col-item">
+          <div class="col-dot" style="background:#9467bd"></div>
+          <label>네이버SEO</label>
+          <input type="text" id="colNaverSeo" value="AX">
+        </div>
+        <div class="col-item">
+          <div class="col-dot" style="background:#e91e9c"></div>
+          <label>구글SEO</label>
+          <input type="text" id="colGoogleSeo" value="AT">
+        </div>
+      </div>
+    </div>
+
+    <!-- 기간 설정 -->
+    <div class="card">
+      <div class="card-title">기간 설정</div>
+      <div class="quick-btns">
+        <button class="quick-btn" onclick="setQuickPeriod(1, this)">1개월</button>
+        <button class="quick-btn" onclick="setQuickPeriod(2, this)">2개월</button>
+        <button class="quick-btn active" onclick="setQuickPeriod(3, this)">3개월</button>
+        <button class="quick-btn" onclick="setQuickPeriod(6, this)">6개월</button>
+        <button class="quick-btn" onclick="setQuickPeriod(0, this)">전체</button>
+      </div>
+      <div class="date-row">
+        <span class="label">시작</span>
+        <input type="text" id="startYear"> <span>년</span>
+        <input type="text" id="startMonth"> <span>월</span>
+        <input type="text" id="startDay"> <span>일</span>
+      </div>
+      <div class="date-row">
+        <span class="label">종료</span>
+        <input type="text" id="endYear"> <span>년</span>
+        <input type="text" id="endMonth"> <span>월</span>
+        <input type="text" id="endDay"> <span>일</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 생성 버튼 -->
+  <div class="btn-row">
+    <button class="btn-action btn-weekly" id="btnWeekly" onclick="generate('weekly')" disabled>주간 평균</button>
+    <button class="btn-action btn-daily" id="btnDaily" onclick="generate('daily')" disabled>일별</button>
+    <button class="btn-action btn-both" id="btnBoth" onclick="generate('both')" disabled>모두 생성</button>
+  </div>
+
+  <!-- 차트 영역 -->
+  <div class="chart-area" id="weeklyChartArea">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title" id="weeklyTitle">주간 평균 매체별 상위노출 개수 + 구글 SEO</div>
+        <div class="chart-subtitle">(노출 기준: 1면, 최대 10위)</div>
+      </div>
+      <button class="btn-download" onclick="downloadChart('weeklyCanvas', 'weekly')">PNG 다운로드</button>
+    </div>
+    <div class="chart-canvas-wrap">
+      <canvas id="weeklyCanvas" height="400"></canvas>
+    </div>
+  </div>
+
+  <div class="chart-area" id="dailyChartArea">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title" id="dailyTitle">일별 매체별 상위노출 개수 + 구글 SEO</div>
+        <div class="chart-subtitle">(노출 기준: 1면, 최대 10위)</div>
+      </div>
+      <button class="btn-download" onclick="downloadChart('dailyCanvas', 'daily')">PNG 다운로드</button>
+    </div>
+    <div class="chart-canvas-wrap">
+      <canvas id="dailyCanvas" height="400"></canvas>
+    </div>
+  </div>
+
+  <!-- 로그 -->
+  <div class="log-area" id="logArea">
+    <span class="log-dim">프로그램 시작. 엑셀 파일을 불러와 주세요.</span>
+  </div>
+</div>
+
+<script>
+// ===== 전역 변수 =====
+let workbook = null;
+let dailyData = [];
+let weeklyChart = null;
+let dailyChart = null;
+
+// ===== 초기화 =====
+window.addEventListener('DOMContentLoaded', () => {
+  setQuickPeriod(3, document.querySelector('.quick-btn.active'));
+});
+
+// ===== 로그 =====
+function log(msg, cls = '') {
+  const el = document.getElementById('logArea');
+  const line = document.createElement('div');
+  line.className = cls ? 'log-' + cls : '';
+  line.textContent = msg;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+
+// ===== 기간 설정 =====
+function setQuickPeriod(months, btn) {
+  document.querySelectorAll('.quick-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+
+  const today = new Date();
+  document.getElementById('endYear').value = today.getFullYear();
+  document.getElementById('endMonth').value = today.getMonth() + 1;
+  document.getElementById('endDay').value = today.getDate();
+
+  if (months === 0) {
+    document.getElementById('startYear').value = 2025;
+    document.getElementById('startMonth').value = 1;
+    document.getElementById('startDay').value = 1;
+  } else {
+    const start = new Date(today);
+    start.setMonth(start.getMonth() - months);
+    document.getElementById('startYear').value = start.getFullYear();
+    document.getElementById('startMonth').value = start.getMonth() + 1;
+    document.getElementById('startDay').value = start.getDate();
+  }
+}
+
+function getDateRange() {
+  const sy = parseInt(document.getElementById('startYear').value);
+  const sm = parseInt(document.getElementById('startMonth').value);
+  const sd = parseInt(document.getElementById('startDay').value);
+  const ey = parseInt(document.getElementById('endYear').value);
+  const em = parseInt(document.getElementById('endMonth').value);
+  const ed = parseInt(document.getElementById('endDay').value);
+  return { start: new Date(sy, sm - 1, sd), end: new Date(ey, em - 1, ed) };
+}
+
+// ===== 열 문자 → 숫자 =====
+function colToNum(colStr) {
+  colStr = colStr.trim().toUpperCase();
+  let num = 0;
+  for (let i = 0; i < colStr.length; i++) {
+    num = num * 26 + (colStr.charCodeAt(i) - 64);
+  }
+  return num - 1; // 0-based for SheetJS
+}
+
+// ===== 파일 로드 =====
+document.getElementById('fileInput').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  document.getElementById('fileName').textContent = file.name;
+  log('파일 로드 중: ' + file.name, 'info');
+
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      workbook = XLSX.read(ev.target.result, { type: 'array' });
+      const sel = document.getElementById('sheetSelect');
+      sel.innerHTML = '';
+      let defaultSheet = null;
+      workbook.SheetNames.forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        sel.appendChild(opt);
+        if (name.includes('일간') || name.includes('보고용')) defaultSheet = name;
+      });
+      if (defaultSheet) sel.value = defaultSheet;
+
+      document.getElementById('btnWeekly').disabled = false;
+      document.getElementById('btnDaily').disabled = false;
+      document.getElementById('btnBoth').disabled = false;
+
+      log('파일 로드 완료: ' + file.name, 'success');
+      log('  시트: ' + workbook.SheetNames.join(', '), 'dim');
+    } catch (err) {
+      log('파일 로드 실패: ' + err.message, 'error');
+      alert('파일 로드 실패: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+// ===== 데이터 읽기 =====
+function readData() {
+  if (!workbook) { alert('파일을 먼저 선택하세요.'); return null; }
+
+  const sheetName = document.getElementById('sheetSelect').value;
+  const ws = workbook.Sheets[sheetName];
+  if (!ws) { alert('시트를 선택하세요.'); return null; }
+
+  const range = getDateRange();
+  const colNums = {
+    self_blog: colToNum(document.getElementById('colSelf').value),
+    out_blog: colToNum(document.getElementById('colOut').value),
+    jisikin: colToNum(document.getElementById('colJisikin').value),
+    naver_seo: colToNum(document.getElementById('colNaverSeo').value),
+    google_seo: colToNum(document.getElementById('colGoogleSeo').value),
+  };
+
+  log('', '');
+  log('기간: ' + formatDate(range.start) + ' ~ ' + formatDate(range.end), 'info');
+
+  // 시트를 2D 배열로 변환
+  const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+
+  let currentMonth = null;
+  const daily = [];
+
+  for (let r = 2; r < data.length; r++) {
+    const row = data[r];
+    if (!row) continue;
+
+    const a = row[0] != null ? String(row[0]) : '';
+    const b = row[1] != null ? String(row[1]) : '';
+
+    // 월 감지
+    if (a.includes('월') && !a.includes('주') && !a.includes('평균')) {
+      const m = parseInt(a.replace(/[^0-9]/g, ''));
+      if (!isNaN(m)) currentMonth = m;
+    }
+
+    // 일 데이터
+    if (b && b.includes('일') && currentMonth) {
+      const day = parseInt(b.replace(/[^0-9]/g, ''));
+      if (isNaN(day)) continue;
+
+      const year = currentMonth >= 7 ? 2025 : 2026;
+      const dt = new Date(year, currentMonth - 1, day);
+
+      if (dt < range.start || dt > range.end) continue;
+
+      const q = getNum(row[colNums.self_blog]);
+      const u = getNum(row[colNums.out_blog]);
+      const y = getNum(row[colNums.jisikin]);
+      const ax = getNum(row[colNums.naver_seo]);
+      const at = row[colNums.google_seo];
+      const atVal = (at != null && at !== '' && at !== 0) ? Number(at) : null;
+
+      if (q !== 0 || u !== 0 || y !== 0 || ax !== 0) {
+        daily.push({
+          date: dt, year, month: currentMonth, day,
+          self_blog: q, out_blog: u, jisikin: y, naver_seo: ax,
+          google_seo: atVal
+        });
+      }
+    }
+  }
+
+  log('데이터 로드: ' + daily.length + '일', 'info');
+  if (daily.length === 0) {
+    alert('선택한 기간에 데이터가 없습니다.');
+    log('데이터 없음!', 'warn');
+    return null;
+  }
+  return daily;
+}
+
+function getNum(v) {
+  if (v == null || v === '') return 0;
+  const n = Number(v);
+  return isNaN(n) ? 0 : n;
+}
+
+function formatDate(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+// ===== 생성 =====
+function generate(mode) {
+  log('─'.repeat(40), 'dim');
+  log('그래프 생성 시작...', 'info');
+
+  const data = readData();
+  if (!data) return;
+  dailyData = data;
+
+  try {
+    if (mode === 'weekly' || mode === 'both') {
+      makeWeeklyChart(data);
+      log('  주간 평균 차트 생성 완료', 'success');
+    }
+    if (mode === 'daily' || mode === 'both') {
+      makeDailyChart(data);
+      log('  일별 차트 생성 완료', 'success');
+    }
+    log('생성 완료!', 'success');
+  } catch (err) {
+    log('오류: ' + err.message, 'error');
+    alert('그래프 생성 실패: ' + err.message);
+  }
+}
+
+// ===== 주간 차트 =====
+function makeWeeklyChart(data) {
+  // 주간 그룹핑
+  const weekMap = new Map();
+  data.forEach(d => {
+    const wk = Math.floor((d.day - 1) / 7) + 1;
+    const key = `${d.year}-${String(d.month).padStart(2,'0')}-${wk}`;
+    const label = `${d.month}월 ${wk}주`;
+    if (!weekMap.has(key)) {
+      weekMap.set(key, { label, self_blog: [], out_blog: [], jisikin: [], naver_seo: [], google_seo: [] });
+    }
+    const w = weekMap.get(key);
+    w.self_blog.push(d.self_blog);
+    w.out_blog.push(d.out_blog);
+    w.jisikin.push(d.jisikin);
+    w.naver_seo.push(d.naver_seo);
+    if (d.google_seo != null) w.google_seo.push(d.google_seo);
+  });
+
+  const sorted = [...weekMap.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  const labels = [], selfAvg = [], outAvg = [], jisikinAvg = [], nseoAvg = [], gseoAvg = [], totalAvg = [];
+
+  sorted.forEach(([, w]) => {
+    labels.push(w.label);
+    const s = Math.round(avg(w.self_blog));
+    const o = Math.round(avg(w.out_blog));
+    const j = Math.round(avg(w.jisikin));
+    const n = Math.round(avg(w.naver_seo));
+    selfAvg.push(s); outAvg.push(o); jisikinAvg.push(j); nseoAvg.push(n);
+    totalAvg.push(s + o + j + n);
+    gseoAvg.push(w.google_seo.length > 0 ? Math.round(avg(w.google_seo)) : 0);
+  });
+
+  // 차트 영역 표시
+  document.getElementById('weeklyChartArea').style.display = 'block';
+  const range = getDateRange();
+  document.getElementById('weeklyTitle').textContent =
+    `주간 평균 매체별 상위노출 개수 + 구글 SEO (${range.start.getMonth()+1}월~${range.end.getMonth()+1}월)`;
+
+  // 기존 차트 제거
+  if (weeklyChart) weeklyChart.destroy();
+
+  const ctx = document.getElementById('weeklyCanvas').getContext('2d');
+  weeklyChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        makeDataset('네이버 합계', totalAvg, '#dc143c', 3.5, 9, true),
+        makeDataset('구글 SEO 노출', gseoAvg, '#e91e9c', 3, 8, true),
+        makeDataset('자체 블로그', selfAvg, '#2ca02c', 2.5, 7, false),
+        makeDataset('외주 블로그', outAvg, '#1f77b4', 2.5, 7, false),
+        makeDataset('지식인', jisikinAvg, '#ff7f0e', 2.5, 7, false),
+        makeDataset('네이버 SEO', nseoAvg, '#9467bd', 2.5, 7, false),
+      ]
+    },
+    options: chartOptions(),
+    plugins: [ChartDataLabels]
+  });
+}
+
+// ===== 일별 차트 =====
+function makeDailyChart(data) {
+  const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+  const labels = [], selfV = [], outV = [], jisikinV = [], nseoV = [], totalV = [], gseoV = [];
+
+  data.forEach(d => {
+    const dt = d.date;
+    labels.push(`${d.month}/${d.day}(${dayNames[dt.getDay()]})`);
+    selfV.push(d.self_blog);
+    outV.push(d.out_blog);
+    jisikinV.push(d.jisikin);
+    nseoV.push(d.naver_seo);
+    totalV.push(d.self_blog + d.out_blog + d.jisikin + d.naver_seo);
+    gseoV.push(d.google_seo);
+  });
+
+  document.getElementById('dailyChartArea').style.display = 'block';
+  const range = getDateRange();
+  const days = Math.round((range.end - range.start) / (1000*60*60*24));
+  document.getElementById('dailyTitle').textContent =
+    `일별 매체별 상위노출 개수 + 구글 SEO (${days}일간)`;
+
+  if (dailyChart) dailyChart.destroy();
+
+  const ctx = document.getElementById('dailyCanvas').getContext('2d');
+  // 일별은 데이터가 많으므로 높이 조정
+  ctx.canvas.height = Math.max(400, 300 + data.length * 3);
+
+  dailyChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        makeDataset('네이버 합계', totalV, '#dc143c', 3, 6, true),
+        makeDataset('구글 SEO 노출', gseoV, '#e91e9c', 2.5, 5, true),
+        makeDataset('자체 블로그', selfV, '#2ca02c', 2, 4, false),
+        makeDataset('외주 블로그', outV, '#1f77b4', 2, 4, false),
+        makeDataset('지식인', jisikinV, '#ff7f0e', 2, 4, false),
+        makeDataset('네이버 SEO', nseoV, '#9467bd', 2, 4, false),
+      ]
+    },
+    options: chartOptions(true),
+    plugins: [ChartDataLabels]
+  });
+}
+
+// ===== 공통 함수 =====
+function makeDataset(label, data, color, width, pointSize, showLabels) {
+  return {
+    label,
+    data,
+    borderColor: color,
+    backgroundColor: 'white',
+    borderWidth: width,
+    pointRadius: pointSize,
+    pointBackgroundColor: 'white',
+    pointBorderColor: color,
+    pointBorderWidth: Math.max(2, width - 0.5),
+    tension: 0.1,
+    spanGaps: true,
+    datalabels: {
+      display: showLabels,
+      color: color,
+      font: { size: label.includes('합계') ? 11 : 10, weight: label.includes('합계') ? 'bold' : 'normal' },
+      anchor: label.includes('구글') ? 'start' : 'end',
+      align: label.includes('구글') ? 'bottom' : 'top',
+      offset: 6,
+      formatter: v => v != null && v !== 0 ? v.toLocaleString() : ''
+    }
+  };
+}
+
+function chartOptions(isDaily = false) {
+  return {
+    responsive: true,
+    maintainAspectRatio: !isDaily,
+    interaction: { intersect: false, mode: 'index' },
+    plugins: {
+      legend: {
+        position: 'right',
+        labels: { usePointStyle: true, padding: 14, font: { size: 12 } }
+      },
+      tooltip: {
+        callbacks: {
+          label: ctx => {
+            const v = ctx.parsed.y;
+            return v != null ? `${ctx.dataset.label}: ${v.toLocaleString()}` : '';
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        ticks: { maxRotation: 45, font: { size: isDaily ? 10 : 12 } },
+        grid: { display: false }
+      },
+      y: {
+        beginAtZero: true,
+        title: { display: true, text: isDaily ? '노출 개수' : '평균 노출 개수', font: { size: 13, weight: 'bold' } },
+        grid: { color: 'rgba(0,0,0,0.07)' },
+        ticks: { font: { size: 11 } }
+      }
+    },
+    layout: { padding: { top: 20, right: 10 } }
+  };
+}
+
+function avg(arr) {
+  if (arr.length === 0) return 0;
+  return arr.reduce((a, b) => a + b, 0) / arr.length;
+}
+
+// ===== PNG 다운로드 =====
+function downloadChart(canvasId, type) {
+  const canvas = document.getElementById(canvasId);
+  // 고해상도 캡처를 위한 임시 캔버스 생성
+  const tempCanvas = document.createElement('canvas');
+  const scale = 2; // 2x 해상도
+  tempCanvas.width = canvas.width * scale;
+  tempCanvas.height = canvas.height * scale;
+  const tempCtx = tempCanvas.getContext('2d');
+  tempCtx.scale(scale, scale);
+  tempCtx.fillStyle = 'white';
+  tempCtx.fillRect(0, 0, canvas.width, canvas.height);
+  tempCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height);
+
+  const today = new Date();
+  const dateStr = String(today.getFullYear()).slice(2) +
+    String(today.getMonth()+1).padStart(2,'0') +
+    String(today.getDate()).padStart(2,'0');
+  const filename = type === 'weekly'
+    ? `${dateStr}_주간평균_꺾은선_구글SEO.png`
+    : `${dateStr}_일별_꺾은선_구글SEO.png`;
+
+  const link = document.createElement('a');
+  link.download = filename;
+  link.href = tempCanvas.toDataURL('image/png');
+  link.click();
+
+  log(`  ${filename} 다운로드`, 'success');
+}
+</script>
+
+</body>
+</html>
